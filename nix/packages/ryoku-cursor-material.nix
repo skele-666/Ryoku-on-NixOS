@@ -17,6 +17,7 @@ pkgs.stdenvNoCC.mkDerivation {
     cp -a ${bibataSrc}/src "$data/src"
     cp -a ${bibataSrc}/svg "$data/svg"
     cp -a ${bibataSrc}/config "$data/config"
+    chmod -R u+w "$data"
 
     install -Dm755 \
       release/packages/ryoku-cursor-material/ryoku-cursor-material-recolor \

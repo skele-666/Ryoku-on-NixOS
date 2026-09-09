@@ -2145,11 +2145,18 @@ func listCursorThemes() []string {
 			continue
 		}
 		for _, e := range entries {
-			if !e.IsDir() {
+			name := e.Name()
+			themeDir := filepath.Join(dir, name)
+
+			// Follow symlinks too — NixOS exposes packages through symlinks
+			// into /nix/store.
+			info, err := os.Stat(themeDir)
+			if err != nil || !info.IsDir() {
 				continue
 			}
-			if _, err := os.Stat(filepath.Join(dir, e.Name(), "cursors")); err == nil {
-				seen[e.Name()] = true
+
+			if _, err := os.Stat(filepath.Join(themeDir, "cursors")); err == nil {
+				seen[name] = true
 			}
 		}
 	}
@@ -2170,6 +2177,10 @@ func iconSearchDirs() []string {
 	return []string{
 		filepath.Join(home, ".icons"),
 		filepath.Join(dataHome, "icons"),
+
+		// NixOS system profile
+		"/run/current-system/sw/share/icons",
+
 		"/usr/share/icons",
 		"/usr/local/share/icons",
 	}
