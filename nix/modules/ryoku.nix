@@ -1,6 +1,11 @@
 { self, ryokuNixpkgs }:
 
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.programs.ryoku;
@@ -38,98 +43,98 @@ let
   # ───────────────────────────────────────────────────────────
 
   qylockMaterializer = pkgs.writeShellScript "ryoku-qylock-materialize" ''
-    set -euo pipefail
+        set -euo pipefail
 
-    source_root="${ryokuDesktopData}/share/ryoku/lockscreen/qylock"
+        source_root="${ryokuDesktopData}/share/ryoku/lockscreen/qylock"
 
-    data_home="$HOME/.local/share"
-    config_home="$HOME/.config"
+        data_home="$HOME/.local/share"
+        config_home="$HOME/.config"
 
-    lock_dir="$data_home/quickshell-lockscreen"
-    themes_dir="$data_home/qylock/themes"
+        lock_dir="$data_home/quickshell-lockscreen"
+        themes_dir="$data_home/qylock/themes"
 
-    if [ ! -f "$source_root/quickshell-lockscreen/lock_shell.qml" ]; then
-      echo "ryoku-qylock-materialize: lockscreen payload is missing" >&2
-      exit 1
-    fi
+        if [ ! -f "$source_root/quickshell-lockscreen/lock_shell.qml" ]; then
+          echo "ryoku-qylock-materialize: lockscreen payload is missing" >&2
+          exit 1
+        fi
 
-    if [ ! -f "$source_root/themes/clockwork/orbital/Main.qml" ]; then
-      echo "ryoku-qylock-materialize: fallback theme is missing" >&2
-      exit 1
-    fi
+        if [ ! -f "$source_root/themes/clockwork/orbital/Main.qml" ]; then
+          echo "ryoku-qylock-materialize: fallback theme is missing" >&2
+          exit 1
+        fi
 
-    install -d \
-      "$data_home" \
-      "$themes_dir" \
-      "$themes_dir/clockwork" \
-      "$config_home/qylock"
+        install -d \
+          "$data_home" \
+          "$themes_dir" \
+          "$themes_dir/clockwork" \
+          "$config_home/qylock"
 
-    # Ryoku owns the lock runtime itself. Refresh it atomically enough for
-    # normal generation switches while keeping user-installed themes separate.
-    tmp="$(mktemp -d "$data_home/.quickshell-lockscreen.XXXXXX")"
-    trap 'rm -rf "$tmp"' EXIT
+        # Ryoku owns the lock runtime itself. Refresh it atomically enough for
+        # normal generation switches while keeping user-installed themes separate.
+        tmp="$(mktemp -d "$data_home/.quickshell-lockscreen.XXXXXX")"
+        trap 'rm -rf "$tmp"' EXIT
 
-    cp -a "$source_root/quickshell-lockscreen/." "$tmp/"
-    chmod -R u+w "$tmp"
-    chmod 700 "$tmp/lock.sh"
+        cp -a "$source_root/quickshell-lockscreen/." "$tmp/"
+        chmod -R u+w "$tmp"
+        chmod 700 "$tmp/lock.sh"
 
-    # NixOS does not ship Arch's pam_fprintd_grosshack module.
-    # Replace qylock's bundled Arch-oriented PAM stack with a
-    # password-only stack using absolute modules from Nix's PAM package.
-    pam_dir="$tmp/assets/pam"
-    mkdir -p "$pam_dir"
+        # NixOS does not ship Arch's pam_fprintd_grosshack module.
+        # Replace qylock's bundled Arch-oriented PAM stack with a
+        # password-only stack using absolute modules from Nix's PAM package.
+        pam_dir="$tmp/assets/pam"
+        mkdir -p "$pam_dir"
 
-    cat > "$pam_dir/ryoku-lock" <<'EOF'
-#%PAM-1.0
-#
-# Ryoku qylock — NixOS PAM stack
-#
-# Fingerprint grosshack support is intentionally omitted until it has
-# a proper Nix package. Password authentication remains fully native.
+        cat > "$pam_dir/ryoku-lock" <<'EOF'
+    #%PAM-1.0
+    #
+    # Ryoku qylock — NixOS PAM stack
+    #
+    # Fingerprint grosshack support is intentionally omitted until it has
+    # a proper Nix package. Password authentication remains fully native.
 
-auth       required  ${config.security.pam.package}/lib/security/pam_unix.so try_first_pass
-auth       optional  ${config.security.pam.package}/lib/security/pam_env.so
-account    required  ${config.security.pam.package}/lib/security/pam_unix.so
-password   required  ${config.security.pam.package}/lib/security/pam_deny.so
-session    required  ${config.security.pam.package}/lib/security/pam_unix.so
-EOF
+    auth       required  ${config.security.pam.package}/lib/security/pam_unix.so try_first_pass
+    auth       optional  ${config.security.pam.package}/lib/security/pam_env.so
+    account    required  ${config.security.pam.package}/lib/security/pam_unix.so
+    password   required  ${config.security.pam.package}/lib/security/pam_deny.so
+    session    required  ${config.security.pam.package}/lib/security/pam_unix.so
+    EOF
 
-    chmod 600 "$pam_dir/ryoku-lock"
+        chmod 600 "$pam_dir/ryoku-lock"
 
 
-    # Linux-PAM also probes the fallback "other" service when using a
-    # custom config directory. Provide a deny-by-default fallback so the
-    # lock journal stays clean and unknown PAM services fail securely.
-    cat > "$pam_dir/other" <<'EOF'
-#%PAM-1.0
-auth       required  ${config.security.pam.package}/lib/security/pam_deny.so
-account    required  ${config.security.pam.package}/lib/security/pam_deny.so
-password   required  ${config.security.pam.package}/lib/security/pam_deny.so
-session    required  ${config.security.pam.package}/lib/security/pam_deny.so
-EOF
+        # Linux-PAM also probes the fallback "other" service when using a
+        # custom config directory. Provide a deny-by-default fallback so the
+        # lock journal stays clean and unknown PAM services fail securely.
+        cat > "$pam_dir/other" <<'EOF'
+    #%PAM-1.0
+    auth       required  ${config.security.pam.package}/lib/security/pam_deny.so
+    account    required  ${config.security.pam.package}/lib/security/pam_deny.so
+    password   required  ${config.security.pam.package}/lib/security/pam_deny.so
+    session    required  ${config.security.pam.package}/lib/security/pam_deny.so
+    EOF
 
-    chmod 600 "$pam_dir/other"
+        chmod 600 "$pam_dir/other"
 
-    rm -rf "$lock_dir"
-    mv "$tmp" "$lock_dir"
-    trap - EXIT
+        rm -rf "$lock_dir"
+        mv "$tmp" "$lock_dir"
+        trap - EXIT
 
-    # Refresh only Ryoku's built-in fallback theme. RyoStore/user themes survive.
-    rm -rf "$themes_dir/clockwork/orbital"
-    cp -a \
-      "$source_root/themes/clockwork/orbital" \
-      "$themes_dir/clockwork/orbital"
+        # Refresh only Ryoku's built-in fallback theme. RyoStore/user themes survive.
+        rm -rf "$themes_dir/clockwork/orbital"
+        cp -a \
+          "$source_root/themes/clockwork/orbital" \
+          "$themes_dir/clockwork/orbital"
 
-    chmod -R u+w "$themes_dir/clockwork/orbital"
+        chmod -R u+w "$themes_dir/clockwork/orbital"
 
-    rm -rf "$lock_dir/themes_link"
-    ln -s "$themes_dir" "$lock_dir/themes_link"
+        rm -rf "$lock_dir/themes_link"
+        ln -s "$themes_dir" "$lock_dir/themes_link"
 
-    # Seed the default once. Never overwrite a user's selected skin.
-    if [ ! -s "$config_home/qylock/theme" ]; then
-      printf '%s\n' 'clockwork/orbital' > "$config_home/qylock/theme"
-      chmod 600 "$config_home/qylock/theme"
-    fi
+        # Seed the default once. Never overwrite a user's selected skin.
+        if [ ! -s "$config_home/qylock/theme" ]; then
+          printf '%s\n' 'clockwork/orbital' > "$config_home/qylock/theme"
+          chmod 600 "$config_home/qylock/theme"
+        fi
   '';
 
   # SDDM itself remains declaratively configured as the fixed "ryoku" theme.
@@ -228,77 +233,81 @@ EOF
     ln -s "${ryokuSddmStateDir}" "$out/share/sddm/themes/ryoku"
   '';
 
+  ryokuUdevRules =
+    pkgs.runCommand "ryoku-udev-rules"
+      {
+        nativeBuildInputs = [
+          pkgs.makeWrapper
+        ];
+      }
+      ''
+        rules="$out/lib/udev/rules.d"
+        libexec="$out/libexec"
 
-  ryokuUdevRules = pkgs.runCommand "ryoku-udev-rules" {
-    nativeBuildInputs = [
-      pkgs.makeWrapper
-    ];
-  } ''
-    rules="$out/lib/udev/rules.d"
-    libexec="$out/libexec"
+        mkdir -p "$rules" "$libexec"
 
-    mkdir -p "$rules" "$libexec"
+        install -Dm755 \
+          ${self}/system/hardware/input/ryoku-hw-qmk \
+          "$libexec/ryoku-hw-qmk"
 
-    install -Dm755 \
-      ${self}/system/hardware/input/ryoku-hw-qmk \
-      "$libexec/ryoku-hw-qmk"
+        patchShebangs "$libexec/ryoku-hw-qmk"
 
-    patchShebangs "$libexec/ryoku-hw-qmk"
+        wrapProgram "$libexec/ryoku-hw-qmk" \
+          --prefix PATH : ${
+            pkgs.lib.makeBinPath [
+              pkgs.coreutils
+              pkgs.gnugrep
+            ]
+          }
 
-    wrapProgram "$libexec/ryoku-hw-qmk" \
-      --prefix PATH : ${pkgs.lib.makeBinPath [
-        pkgs.coreutils
-        pkgs.gnugrep
-      ]}
+        install -Dm644 \
+          ${self}/system/hardware/ddc/60-ryoku-i2c.rules \
+          "$rules/60-ryoku-i2c.rules"
 
-    install -Dm644 \
-      ${self}/system/hardware/ddc/60-ryoku-i2c.rules \
-      "$rules/60-ryoku-i2c.rules"
+        install -Dm644 \
+          ${self}/system/hardware/input/62-ryoku-qmk-hid.rules \
+          "$rules/62-ryoku-qmk-hid.rules"
 
-    install -Dm644 \
-      ${self}/system/hardware/input/62-ryoku-qmk-hid.rules \
-      "$rules/62-ryoku-qmk-hid.rules"
+        install -Dm644 \
+          ${self}/system/hardware/audio/70-ryoku-maono.rules \
+          "$rules/70-ryoku-maono.rules"
 
-    install -Dm644 \
-      ${self}/system/hardware/audio/70-ryoku-maono.rules \
-      "$rules/70-ryoku-maono.rules"
+        install -Dm644 \
+          ${self}/system/hardware/input/72-ryoku-keyboard-uaccess.rules \
+          "$rules/72-ryoku-keyboard-uaccess.rules"
 
-    install -Dm644 \
-      ${self}/system/hardware/input/72-ryoku-keyboard-uaccess.rules \
-      "$rules/72-ryoku-keyboard-uaccess.rules"
+        install -Dm644 \
+          ${self}/system/hardware/display/90-ryoku-backlight.rules \
+          "$rules/90-ryoku-backlight.rules"
 
-    install -Dm644 \
-      ${self}/system/hardware/display/90-ryoku-backlight.rules \
-      "$rules/90-ryoku-backlight.rules"
+        install -Dm644 \
+          ${self}/system/hardware/gpu/90-ryoku-gpu.rules \
+          "$rules/90-ryoku-gpu.rules"
 
-    install -Dm644 \
-      ${self}/system/hardware/gpu/90-ryoku-gpu.rules \
-      "$rules/90-ryoku-gpu.rules"
+        substituteInPlace "$rules/62-ryoku-qmk-hid.rules" \
+          --replace-fail \
+            "/usr/bin/ryoku-hw-qmk" \
+            "$libexec/ryoku-hw-qmk"
 
-    substituteInPlace "$rules/62-ryoku-qmk-hid.rules" \
-      --replace-fail \
-        "/usr/bin/ryoku-hw-qmk" \
-        "$libexec/ryoku-hw-qmk"
+        substituteInPlace "$rules/90-ryoku-backlight.rules" \
+          --replace-fail \
+            "/usr/bin/chgrp" \
+            "${pkgs.coreutils}/bin/chgrp" \
+          --replace-fail \
+            "/usr/bin/chmod" \
+            "${pkgs.coreutils}/bin/chmod"
 
-    substituteInPlace "$rules/90-ryoku-backlight.rules" \
-      --replace-fail \
-        "/usr/bin/chgrp" \
-        "${pkgs.coreutils}/bin/chgrp" \
-      --replace-fail \
-        "/usr/bin/chmod" \
-        "${pkgs.coreutils}/bin/chmod"
-
-    substituteInPlace "$rules/90-ryoku-gpu.rules" \
-      --replace-fail \
-        "/bin/sh" \
-        "${pkgs.runtimeShell}" \
-      --replace-fail \
-        "| sed " \
-        "| ${pkgs.gnused}/bin/sed " \
-      --replace-fail \
-        "| tr " \
-        "| ${pkgs.coreutils}/bin/tr "
-  '';
+        substituteInPlace "$rules/90-ryoku-gpu.rules" \
+          --replace-fail \
+            "/bin/sh" \
+            "${pkgs.runtimeShell}" \
+          --replace-fail \
+            "| sed " \
+            "| ${pkgs.gnused}/bin/sed " \
+          --replace-fail \
+            "| tr " \
+            "| ${pkgs.coreutils}/bin/tr "
+      '';
 
   qmlRoot = "${ryokuPkgs.ryoku-qml}/lib/qt-6/qml";
 
@@ -317,8 +326,7 @@ EOF
   # package alongside its other first-party dependencies.
   ryokuWaifu2x = ryokuPkgs.ryoku-waifu2x;
 
-  waifu2xModels =
-    "${ryokuWaifu2x}/share/waifu2x-ncnn-vulkan/models-cunet";
+  waifu2xModels = "${ryokuWaifu2x}/share/waifu2x-ncnn-vulkan/models-cunet";
 
   # Upstream ships mpv together with mpv-mpris so radio/media
   # playback appears on the desktop's MPRIS bus.
@@ -337,35 +345,32 @@ EOF
     ryokuNixpkgs.qt6.qtimageformats
   ];
 
-  optionalPkg = name:
-    lib.optional (builtins.hasAttr name pkgs)
-      (builtins.getAttr name pkgs);
+  optionalPkg = name: lib.optional (builtins.hasAttr name pkgs) (builtins.getAttr name pkgs);
 
-  optionalRuntime =
-    lib.concatMap optionalPkg [
-      "adw-gtk3"
-      "gnome-themes-extra"
-      "papirus-icon-theme"
-      "bibata-cursors"
+  optionalRuntime = lib.concatMap optionalPkg [
+    "adw-gtk3"
+    "gnome-themes-extra"
+    "papirus-icon-theme"
+    "bibata-cursors"
 
-      "cliphist"
-      "yt-dlp"
-      "zenity"
-      "tesseract"
-      "zbar"
-      "wf-recorder"
-      "hyprsunset"
-      "wtype"
-      "openrgb"
-      "libqalculate"
-      "songrec"
-      "ddcutil"
-      "gamescope"
-      "gamemode"
-      "mangohud"
-      "gpu-screen-recorder"
-      "hyprland-preview-share-picker"
-    ];
+    "cliphist"
+    "yt-dlp"
+    "zenity"
+    "tesseract"
+    "zbar"
+    "wf-recorder"
+    "hyprsunset"
+    "wtype"
+    "openrgb"
+    "libqalculate"
+    "songrec"
+    "ddcutil"
+    "gamescope"
+    "gamemode"
+    "mangohud"
+    "gpu-screen-recorder"
+    "hyprland-preview-share-picker"
+  ];
 
   # NixOS cannot keep setuid executables in the immutable Nix store.
   # Expose only the privileged wrappers Ryoku needs through the shell's
@@ -378,187 +383,186 @@ EOF
     ln -s       "${config.security.wrapperDir}/sudo"       "$out/bin/sudo"
   '';
 
-  runtimePackages = with pkgs; [
-    # ─────────────────────────────────────────────────────────
-    # Ryoku
-    # ─────────────────────────────────────────────────────────
+  runtimePackages =
+    with pkgs;
+    [
+      # ─────────────────────────────────────────────────────────
+      # Ryoku
+      # ─────────────────────────────────────────────────────────
 
-    ryokuBundle
-    materializer
-    ryokuSddmThemeApply
-    ryokuSddmTheme
-    ryokuPkgs.gpk
+      ryokuBundle
+      materializer
+      ryokuSddmThemeApply
+      ryokuSddmTheme
+      ryokuPkgs.gpk
 
-    # ─────────────────────────────────────────────────────────
-    # Standard userspace expected by Ryoku's shell snippets
-    #
-    # systemd `path = ...` creates an intentionally restricted
-    # service PATH. Without these, even "bash", "sh", "pgrep",
-    # "ip", "awk", etc. are invisible to QML Process{}.
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Standard userspace expected by Ryoku's shell snippets
+      #
+      # systemd `path = ...` creates an intentionally restricted
+      # service PATH. Without these, even "bash", "sh", "pgrep",
+      # "ip", "awk", etc. are invisible to QML Process{}.
+      # ─────────────────────────────────────────────────────────
 
-    bash
-    coreutils
-    findutils
-    gnugrep
-    gnused
-    gawk
-    procps
-    iproute2
-    util-linux
-    systemd
-    dbus
-    which
-    file
-    less
+      bash
+      coreutils
+      findutils
+      gnugrep
+      gnused
+      gawk
+      procps
+      iproute2
+      util-linux
+      systemd
+      dbus
+      which
+      file
+      less
 
-    # Ryoku terminal / desktop baseline
-    bash-completion
-    bat
-    eza
-    fzf
-    mise
-    zoxide
-    gh
-    desktop-file-utils
-    ryokuWaifu2x
+      # Ryoku terminal / desktop baseline
+      bash-completion
+      bat
+      eza
+      fzf
+      mise
+      zoxide
+      gh
+      desktop-file-utils
+      ryokuWaifu2x
 
-    # ─────────────────────────────────────────────────────────
-    # Compositor / shell
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Compositor / shell
+      # ─────────────────────────────────────────────────────────
 
-    ryokuQuickshell
-    ryokuHyprPlugins
+      ryokuQuickshell
+      ryokuHyprPlugins
 
-    # ─────────────────────────────────────────────────────────
-    # Qt / QML
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Qt / QML
+      # ─────────────────────────────────────────────────────────
 
-    qt6.qtdeclarative
-    qt6.qtmultimedia
-    qt6.qtwayland
-    qt6.qt5compat
-    qt6.qtsvg
-    qt6.qtimageformats
-    qt6Packages.qt6ct
-    kdePackages.syntax-highlighting
+      qt6.qtdeclarative
+      qt6.qtmultimedia
+      qt6.qtwayland
+      qt6.qt5compat
+      qt6.qtsvg
+      qt6.qtimageformats
+      qt6Packages.qt6ct
+      kdePackages.syntax-highlighting
 
-    # ─────────────────────────────────────────────────────────
-    # Session / portals / secrets
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Session / portals / secrets
+      # ─────────────────────────────────────────────────────────
 
-    gnome-keyring
-    xdg-desktop-portal-gtk
+      gnome-keyring
+      xdg-desktop-portal-gtk
 
-    # ─────────────────────────────────────────────────────────
-    # Desktop applications
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Desktop applications
+      # ─────────────────────────────────────────────────────────
 
-    kitty
-    fish
-    starship
-    fastfetch
-    yazi
-    neovim
-    nautilus
-    nautilus-python
+      kitty
+      fish
+      starship
+      fastfetch
+      yazi
+      neovim
+      nautilus
+      nautilus-python
 
-    # ─────────────────────────────────────────────────────────
-    # Ryoport / local virtual machines
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Ryoport / local virtual machines
+      # ─────────────────────────────────────────────────────────
 
-    quickemu
-    qemu
-    spice-gtk
-    xorriso
+      quickemu
+      qemu
+      spice-gtk
+      xorriso
 
-    # ─────────────────────────────────────────────────────────
-    # Ryoku command dependencies
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Ryoku command dependencies
+      # ─────────────────────────────────────────────────────────
 
-    hypridle
-    brightnessctl
-    playerctl
+      hypridle
+      brightnessctl
+      playerctl
 
-    pipewire
-    wireplumber
-    pulseaudio
+      pipewire
+      wireplumber
+      pulseaudio
 
-    mpvWithMpris
-    wl-clipboard
-    hyprpicker
-    grim
-    slurp
-    cava
+      mpvWithMpris
+      wl-clipboard
+      hyprpicker
+      grim
+      slurp
+      cava
 
-    jq
-    imagemagick
-    ryokuMatugen
-    ffmpeg
-    openssl
-    nvibrant
-    vulkan-tools
-    ryokuCursorMaterial
+      jq
+      imagemagick
+      ryokuMatugen
+      ffmpeg
+      openssl
+      nvibrant
+      vulkan-tools
+      ryokuCursorMaterial
 
-    bibata-cursors
-    vimix-cursors
-    phinger-cursors
-    apple-cursor
+      bibata-cursors
+      # ryokuCursors
+      vimix-cursors
+      phinger-cursors
+      apple-cursor
 
-    # ─────────────────────────────────────────────────────────
-    # Networking / hardware
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Networking / hardware
+      # ─────────────────────────────────────────────────────────
 
-    networkmanager
-    iwd
-    iw
-    bluez
+      networkmanager
+      iwd
+      iw
+      bluez
 
-    upower
-    power-profiles-daemon
-    pavucontrol
+      upower
+      power-profiles-daemon
+      pavucontrol
 
-    # ─────────────────────────────────────────────────────────
-    # Shell probes used by panels/settings
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Shell probes used by panels/settings
+      # ─────────────────────────────────────────────────────────
 
-    fd
-    inxi
-    lm_sensors
-    mako
-    pciutils
-    usbutils
+      fd
+      inxi
+      lm_sensors
+      mako
+      pciutils
+      usbutils
 
-    # ─────────────────────────────────────────────────────────
-    # Misc
-    # ─────────────────────────────────────────────────────────
+      # ─────────────────────────────────────────────────────────
+      # Misc
+      # ─────────────────────────────────────────────────────────
 
-    python3
+      python3
 
-    # Rashin setup/runtime prerequisites. Rashin itself remains
-    # opt-in; these mirror the dependencies of the upstream package.
-    uv
-    nodejs
-    gcc
-    sqlite
+      # Rashin setup/runtime prerequisites. Rashin itself remains
+      # opt-in; these mirror the dependencies of the upstream package.
+      uv
+      nodejs
+      gcc
+      sqlite
 
-    curl
-    glib
-    libnotify
-    xdg-utils
-  ] ++ optionalRuntime;
+      curl
+      glib
+      libnotify
+      xdg-utils
+    ]
+    ++ optionalRuntime;
 
   # Number of direct packages in the final NixOS system profile.
   #
   # This deliberately counts environment.systemPackages rather than
   # walking the Nix store closure. The latter includes dependencies and
   # gives misleadingly huge package totals in the Ryoku profile page.
-  systemPackageCount =
-    builtins.length (
-      lib.unique (
-        map toString config.environment.systemPackages
-      )
-    );
+  systemPackageCount = builtins.length (lib.unique (map toString config.environment.systemPackages));
 
   # The Ryoku service can be requested before the display manager's
   # Hyprland process has exported WAYLAND_DISPLAY into systemd.
@@ -566,72 +570,71 @@ EOF
   # Rather than starting the daemon with WAYLAND_DISPLAY="", wait for
   # the manager environment to contain a real, live Wayland socket and
   # then exec the daemon with that exact session environment.
-  ryokuSessionLauncher =
-    pkgs.writeShellScript "ryoku-shell-session-launcher" ''
-      set -euo pipefail
+  ryokuSessionLauncher = pkgs.writeShellScript "ryoku-shell-session-launcher" ''
+    set -euo pipefail
 
-      # Ryoku's service has a deterministic Nix PATH containing its own
-      # runtime dependencies. Launcher entries, however, may point to
-      # arbitrary applications installed by the user or system.
-      #
-      # Preserve Ryoku's dependencies first, then expose the normal
-      # NixOS/user executable locations so .desktop Exec commands work.
-      export PATH="$PATH:/run/current-system/sw/bin:$HOME/.nix-profile/bin:/etc/profiles/per-user/$USER/bin:$HOME/.local/bin"
+    # Ryoku's service has a deterministic Nix PATH containing its own
+    # runtime dependencies. Launcher entries, however, may point to
+    # arbitrary applications installed by the user or system.
+    #
+    # Preserve Ryoku's dependencies first, then expose the normal
+    # NixOS/user executable locations so .desktop Exec commands work.
+    export PATH="$PATH:/run/current-system/sw/bin:$HOME/.nix-profile/bin:/etc/profiles/per-user/$USER/bin:$HOME/.local/bin"
 
-      get_manager_env() {
-        manager_env="$(
-          ${pkgs.systemd}/bin/systemctl \
-            --user show-environment 2>/dev/null || true
-        )"
+    get_manager_env() {
+      manager_env="$(
+        ${pkgs.systemd}/bin/systemctl \
+          --user show-environment 2>/dev/null || true
+      )"
 
-        printf '%s\n' "$manager_env" |
-          ${pkgs.gnused}/bin/sed -n "s/^$1=//p" |
-          ${pkgs.coreutils}/bin/head -n 1
-      }
+      printf '%s\n' "$manager_env" |
+        ${pkgs.gnused}/bin/sed -n "s/^$1=//p" |
+        ${pkgs.coreutils}/bin/head -n 1
+    }
 
-      attempts=0
+    attempts=0
 
-      while [ "$attempts" -lt 300 ]; do
-        runtime_dir="$(get_manager_env XDG_RUNTIME_DIR)"
-        wayland_display="$(get_manager_env WAYLAND_DISPLAY)"
+    while [ "$attempts" -lt 300 ]; do
+      runtime_dir="$(get_manager_env XDG_RUNTIME_DIR)"
+      wayland_display="$(get_manager_env WAYLAND_DISPLAY)"
 
-        if [ -z "$runtime_dir" ]; then
-          runtime_dir="''${XDG_RUNTIME_DIR:-/run/user/$UID}"
-        fi
+      if [ -z "$runtime_dir" ]; then
+        runtime_dir="''${XDG_RUNTIME_DIR:-/run/user/$UID}"
+      fi
 
-        if [ -n "$wayland_display" ] &&
-           [ -S "$runtime_dir/$wayland_display" ]; then
+      if [ -n "$wayland_display" ] &&
+         [ -S "$runtime_dir/$wayland_display" ]; then
 
-          export XDG_RUNTIME_DIR="$runtime_dir"
-          export WAYLAND_DISPLAY="$wayland_display"
+        export XDG_RUNTIME_DIR="$runtime_dir"
+        export WAYLAND_DISPLAY="$wayland_display"
 
-          for key in \
-            DISPLAY \
-            HYPRLAND_INSTANCE_SIGNATURE \
-            XDG_CURRENT_DESKTOP \
-            XDG_SESSION_DESKTOP \
-            XDG_SESSION_TYPE \
-            XDG_SESSION_ID
-          do
-            value="$(get_manager_env "$key")"
+        for key in \
+          DISPLAY \
+          HYPRLAND_INSTANCE_SIGNATURE \
+          XDG_CURRENT_DESKTOP \
+          XDG_SESSION_DESKTOP \
+          XDG_SESSION_TYPE \
+          XDG_SESSION_ID
+        do
+          value="$(get_manager_env "$key")"
 
-            if [ -n "$value" ]; then
-              export "$key=$value"
-            fi
-          done
+          if [ -n "$value" ]; then
+            export "$key=$value"
+          fi
+        done
 
-          exec ${ryokuShell}/bin/ryoku-shell daemon
-        fi
+        exec ${ryokuShell}/bin/ryoku-shell daemon
+      fi
 
-        attempts=$((attempts + 1))
-        ${pkgs.coreutils}/bin/sleep 0.1
-      done
+      attempts=$((attempts + 1))
+      ${pkgs.coreutils}/bin/sleep 0.1
+    done
 
-      printf '%s\n' \
-        "ryoku-shell: timed out waiting for the Hyprland Wayland socket" >&2
+    printf '%s\n' \
+      "ryoku-shell: timed out waiting for the Hyprland Wayland socket" >&2
 
-      exit 1
-    '';
+    exit 1
+  '';
 
 in
 {
@@ -683,18 +686,11 @@ in
 
   config = lib.mkIf cfg.enable {
     # apple-cursor is part of Ryoku's cursor catalogue and is unfree in nixpkgs.
-    nixpkgs.config.allowUnfreePredicate = lib.mkDefault (
-      pkg: lib.getName pkg == "apple_cursor"
-    );
+    nixpkgs.config.allowUnfreePredicate = lib.mkDefault (pkg: lib.getName pkg == "apple_cursor");
 
     # Preserve Fish as Ryoku's upstream default while allowing Zsh as a
     # declarative NixOS alternative. Explicit per-user shell settings win.
-    users.defaultUserShell =
-      lib.mkOverride 900 (
-        if cfg.shell == "fish"
-        then pkgs.fish
-        else pkgs.zsh
-      );
+    users.defaultUserShell = lib.mkOverride 900 (if cfg.shell == "fish" then pkgs.fish else pkgs.zsh);
 
     programs.fish = lib.mkIf (cfg.shell == "fish") {
       enable = true;
@@ -710,10 +706,8 @@ in
         lta = "eza --tree --level=2 --long --icons --git -a";
       };
 
-      interactiveShellInit =
-        lib.mkAfter (builtins.readFile ../shell/ryoku.zsh);
+      interactiveShellInit = lib.mkAfter (builtins.readFile ../shell/ryoku.zsh);
     };
-
 
     programs.hyprland = {
       enable = true;
@@ -850,7 +844,6 @@ in
     # stack can still override this.
     networking.networkmanager.enable = lib.mkDefault true;
 
-
     # Ryoku NixOS mutable network bridge.
     #
     # Nix owns the /etc path names. Runtime choices live under
@@ -892,8 +885,7 @@ in
     # Re-apply a persisted regulatory domain before networking.
     # With no configured country this is intentionally a no-op.
     systemd.services.ryoku-network-regdom = {
-      description =
-        "Restore Ryoku wireless regulatory domain";
+      description = "Restore Ryoku wireless regulatory domain";
 
       wantedBy = [
         "network-pre.target"
@@ -913,8 +905,7 @@ in
       serviceConfig = {
         Type = "oneshot";
 
-        ExecStart =
-          "${ryokuSystemBridge}/bin/ryoku-wifi-regdom apply";
+        ExecStart = "${ryokuSystemBridge}/bin/ryoku-wifi-regdom apply";
       };
     };
 
@@ -922,8 +913,7 @@ in
     # This unit merely makes sure only the selected supplicant owns
     # the radio after boot.
     systemd.services.ryoku-network-backend = {
-      description =
-        "Reconcile Ryoku NetworkManager Wi-Fi backend";
+      description = "Reconcile Ryoku NetworkManager Wi-Fi backend";
 
       wantedBy = [
         "multi-user.target"
@@ -940,8 +930,7 @@ in
       serviceConfig = {
         Type = "oneshot";
 
-        ExecStart =
-          "${ryokuSystemBridge}/bin/ryoku-wifi-backend reconcile";
+        ExecStart = "${ryokuSystemBridge}/bin/ryoku-wifi-backend reconcile";
       };
     };
 
@@ -1017,25 +1006,22 @@ in
       fi
     '';
 
-    environment.systemPackages =
-      runtimePackages;
-
+    environment.systemPackages = runtimePackages;
 
     # Ryoku's login greeter. Plasma enables SDDM on systems which ship it;
     # this overrides Plasma's default Breeze choice without overriding an
     # explicit user-selected SDDM theme.
-    services.displayManager.sddm =
-      lib.mkIf config.services.displayManager.sddm.enable {
-        theme = lib.mkOverride 900 "ryoku";
+    services.displayManager.sddm = lib.mkIf config.services.displayManager.sddm.enable {
+      theme = lib.mkOverride 900 "ryoku";
 
-        extraPackages = [
-          ryokuSddmTheme
-          pkgs.qt6.qt5compat
-          pkgs.qt6.qtdeclarative
-          pkgs.qt6.qtmultimedia
-          pkgs.qt6.qtsvg
-        ];
-      };
+      extraPackages = [
+        ryokuSddmTheme
+        pkgs.qt6.qt5compat
+        pkgs.qt6.qtdeclarative
+        pkgs.qt6.qtmultimedia
+        pkgs.qt6.qtsvg
+      ];
+    };
 
     # NixOS uses Ryoku's Nix-only update backend; the Arch transaction stays disabled.
     # Session scope also covers Hub instances launched directly.
@@ -1046,42 +1032,37 @@ in
       RYOKU_I18N_DIR = "${ryokuDesktopData}/share/ryoku/i18n";
       RYOKU_NIX_FLAKE = cfg.updateFlake;
       RYOKU_NIX_INPUT = cfg.updateInput;
-      RYOKU_NIX_SUDO =
-        "${config.security.wrapperDir}/sudo";
-      RYOKU_SDDM_THEME_APPLY =
-        "${ryokuSddmThemeApply}/bin/ryoku-sddm-theme-apply";
+      RYOKU_NIX_SUDO = "${config.security.wrapperDir}/sudo";
+      RYOKU_SDDM_THEME_APPLY = "${ryokuSddmThemeApply}/bin/ryoku-sddm-theme-apply";
       RYOKU_SYSTEM_UPDATES_EXTERNAL = "0";
 
       # Hyprland plugin binaries are ABI-sensitive generation state.
       # Hub may configure them, but Nix owns compilation and package paths.
       RYOKU_HYPR_PLUGINS_MANAGED = "nix";
-      RYOKU_HYPR_PLUGIN_DIR =
-        "${ryokuHyprPlugins}/lib/hyprland/plugins";
+      RYOKU_HYPR_PLUGIN_DIR = "${ryokuHyprPlugins}/lib/hyprland/plugins";
 
       # Ryowalls and Ryoshot normally use Arch's /usr/share
       # model path. Point them at the immutable nixpkgs payload.
       RYOKU_WAIFU2X_MODELS = waifu2xModels;
     };
 
-    environment.etc."ryoku/nix-system-package-count".text =
-      "${toString systemPackageCount}\n";
+    environment.etc."ryoku/nix-system-package-count".text = "${toString systemPackageCount}\n";
 
-    fonts.packages =
-      [
-        pkgs.inter
-        pkgs.fraunces
-        spaceGrotesk
-        ryokuMapleMonoNF
+    fonts.packages = [
+      pkgs.inter
+      pkgs.fraunces
+      spaceGrotesk
+      ryokuMapleMonoNF
 
-        pkgs.nerd-fonts.jetbrains-mono
-        pkgs.nerd-fonts.space-mono
-        pkgs.nerd-fonts.fira-code
-        pkgs.nerd-fonts.hack
-        pkgs.noto-fonts
-        pkgs.noto-fonts-color-emoji
-      ]
-      ++ optionalPkg "noto-fonts-cjk-sans"
-      ++ optionalPkg "material-symbols";
+      pkgs.nerd-fonts.jetbrains-mono
+      pkgs.nerd-fonts.space-mono
+      pkgs.nerd-fonts.fira-code
+      pkgs.nerd-fonts.hack
+      pkgs.noto-fonts
+      pkgs.noto-fonts-color-emoji
+    ]
+    ++ optionalPkg "noto-fonts-cjk-sans"
+    ++ optionalPkg "material-symbols";
 
     systemd.user.targets.hyprland-session = {
       description = "Ryoku Hyprland session";
@@ -1143,8 +1124,7 @@ in
       ];
 
       serviceConfig = {
-        ExecStart =
-          "${pkgs.hypridle}/bin/hypridle -c %h/.config/hypr/hypridle.conf";
+        ExecStart = "${pkgs.hypridle}/bin/hypridle -c %h/.config/hypr/hypridle.conf";
 
         Restart = "on-failure";
         RestartSec = "1s";
@@ -1164,8 +1144,7 @@ in
 
       serviceConfig = {
         Type = "simple";
-        ExecStart =
-          "${pkgs.pipewire}/bin/pipewire -c %t/ryoku/eq/filter-chain.conf";
+        ExecStart = "${pkgs.pipewire}/bin/pipewire -c %t/ryoku/eq/filter-chain.conf";
         Restart = "on-failure";
         RestartSec = 2;
         Slice = "session.slice";
@@ -1173,8 +1152,7 @@ in
     };
 
     systemd.user.services.ryoku-bluetooth-reset = {
-      description =
-        "Reset the Bluetooth controller once the Ryoku audio session is ready";
+      description = "Reset the Bluetooth controller once the Ryoku audio session is ready";
 
       wantedBy = [
         "hyprland-session.target"
@@ -1195,8 +1173,7 @@ in
 
       serviceConfig = {
         Type = "oneshot";
-        ExecStart =
-          "${pkgs.systemd}/bin/systemctl restart bluetooth.service";
+        ExecStart = "${pkgs.systemd}/bin/systemctl restart bluetooth.service";
         TimeoutStartSec = 30;
       };
     };
@@ -1211,8 +1188,7 @@ in
       path = runtimePackages;
 
       environment = {
-        RYOKU_RASHIN_SKILLS =
-          "${ryokuRashin}/share/ryoku/skills";
+        RYOKU_RASHIN_SKILLS = "${ryokuRashin}/share/ryoku/skills";
       };
 
       unitConfig = {
@@ -1220,8 +1196,7 @@ in
       };
 
       serviceConfig = {
-        ExecStart =
-          "${ryokuRashin}/bin/ryoku-rashin serve --if-enabled";
+        ExecStart = "${ryokuRashin}/bin/ryoku-rashin serve --if-enabled";
 
         Restart = "on-failure";
         RestartSec = 2;
@@ -1311,8 +1286,7 @@ in
           ${materializer}/bin/ryoku-materialize
         '';
 
-        ExecStartPost =
-          "${qylockMaterializer}";
+        ExecStartPost = "${qylockMaterializer}";
       };
     };
 
@@ -1400,18 +1374,14 @@ in
 
       # The daemon shells out to the normal Ryoku desktop tools,
       # while hyprctl must come from Ryoku's ABI-matched compositor.
-      path =
-        runtimePackages
-        ++ [ ryokuHyprland ];
+      path = runtimePackages ++ [ ryokuHyprland ];
 
       environment = {
         RYOKU_WAIFU2X_MODELS = waifu2xModels;
 
-        QML_IMPORT_PATH =
-          "${qmlRoot}:${qtQmlPath}";
+        QML_IMPORT_PATH = "${qmlRoot}:${qtQmlPath}";
 
-        QML2_IMPORT_PATH =
-          "${qmlRoot}:${qtQmlPath}";
+        QML2_IMPORT_PATH = "${qmlRoot}:${qtQmlPath}";
       };
 
       unitConfig = {
@@ -1420,8 +1390,7 @@ in
       };
 
       serviceConfig = {
-        ExecStart =
-          "${ryokuRyogami}/bin/ryogami";
+        ExecStart = "${ryokuRyogami}/bin/ryogami";
 
         Restart = "always";
         RestartSec = 2;
@@ -1468,27 +1437,22 @@ in
         RYOKU_UPDATE_BACKEND = "nix";
         RYOKU_NIX_FLAKE = cfg.updateFlake;
         RYOKU_NIX_INPUT = cfg.updateInput;
-        RYOKU_NIX_SUDO =
-          "${config.security.wrapperDir}/sudo";
-        RYOKU_SDDM_THEME_APPLY =
-          "${ryokuSddmThemeApply}/bin/ryoku-sddm-theme-apply";
+        RYOKU_NIX_SUDO = "${config.security.wrapperDir}/sudo";
+        RYOKU_SDDM_THEME_APPLY = "${ryokuSddmThemeApply}/bin/ryoku-sddm-theme-apply";
         RYOKU_SYSTEM_UPDATES_EXTERNAL = "0";
 
-      # Hyprland plugin binaries are ABI-sensitive generation state.
-      # Hub may configure them, but Nix owns compilation and package paths.
-      RYOKU_HYPR_PLUGINS_MANAGED = "nix";
-      RYOKU_HYPR_PLUGIN_DIR =
-        "${ryokuHyprPlugins}/lib/hyprland/plugins";
+        # Hyprland plugin binaries are ABI-sensitive generation state.
+        # Hub may configure them, but Nix owns compilation and package paths.
+        RYOKU_HYPR_PLUGINS_MANAGED = "nix";
+        RYOKU_HYPR_PLUGIN_DIR = "${ryokuHyprPlugins}/lib/hyprland/plugins";
         RYOKU_WAIFU2X_MODELS = waifu2xModels;
 
         QT_MEDIA_BACKEND = "ffmpeg";
         QT_FFMPEG_DECODING_HW_DEVICE_TYPES = "";
 
-        QML_IMPORT_PATH =
-          "${qmlRoot}:${qtQmlPath}";
+        QML_IMPORT_PATH = "${qmlRoot}:${qtQmlPath}";
 
-        QML2_IMPORT_PATH =
-          "${qmlRoot}:${qtQmlPath}";
+        QML2_IMPORT_PATH = "${qmlRoot}:${qtQmlPath}";
       };
 
       unitConfig = {
@@ -1497,11 +1461,9 @@ in
       };
 
       serviceConfig = {
-        ExecStartPre =
-          "-${ryokuShell}/bin/ryoku-shell quit";
+        ExecStartPre = "-${ryokuShell}/bin/ryoku-shell quit";
 
-        ExecStart =
-          ryokuSessionLauncher;
+        ExecStart = ryokuSessionLauncher;
 
         Restart = "always";
         RestartSec = 2;
